@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sail Squisher</title>
+    <title>Quick Sail Analyser</title>
     <style>
         * {
             margin: 0;
@@ -103,6 +103,7 @@
 
         .canvas-box {
             text-align: center;
+            position: relative;
         }
 
         .canvas-box h3 {
@@ -111,10 +112,20 @@
             font-size: 1.1em;
         }
 
-        canvas {
+        canvas, #mobilePreview {
             max-width: 100%;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* This allows the user to long-press the canvas on mobile */
+        #mobilePreview {
+            position: absolute;
+            top: 32px; /* Adjust based on H3 height */
+            left: 0;
+            width: 100%;
+            opacity: 0;
+            -webkit-touch-callout: default;
         }
 
         .info {
@@ -124,13 +135,13 @@
             margin-top: 20px;
             font-size: 0.9em;
             color: #555;
+            line-height: 1.5;
         }
 
         @media (max-width: 768px) {
             .canvas-wrapper {
                 grid-template-columns: 1fr;
             }
-            
             .container {
                 padding: 20px;
             }
@@ -140,7 +151,7 @@
 <body>
     <div class="container">
         <h1>⛵ Quick Sail Analyser</h1>
-        <p class="subtitle">Transform your images: 50% shorter, 100% wider</p>
+        <p class="subtitle">Transform your images: 40% shorter, 40% wider</p>
 
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📸</div>
@@ -158,10 +169,11 @@
                 <div class="canvas-box">
                     <h3>Transformed</h3>
                     <canvas id="transformedCanvas"></canvas>
+                    <img id="mobilePreview" alt="Long press to save">
                 </div>
             </div>
             <div style="text-align: center;">
-                <button class="btn" id="downloadBtn">Download Transformed Image</button>
+                <button class="btn" id="downloadBtn">Download Image</button>
                 <button class="btn" id="resetBtn" style="background: #666;">Upload New Image</button>
             </div>
             <div class="info" id="info"></div>
@@ -174,6 +186,7 @@
         const canvasContainer = document.getElementById('canvasContainer');
         const originalCanvas = document.getElementById('originalCanvas');
         const transformedCanvas = document.getElementById('transformedCanvas');
+        const mobilePreview = document.getElementById('mobilePreview');
         const downloadBtn = document.getElementById('downloadBtn');
         const resetBtn = document.getElementById('resetBtn');
         const info = document.getElementById('info');
@@ -214,39 +227,55 @@
         }
 
         function displayImages(img) {
+            // Setup Original
             const origCtx = originalCanvas.getContext('2d');
             originalCanvas.width = img.width;
             originalCanvas.height = img.height;
             origCtx.drawImage(img, 0, 0);
 
-            const newWidth = Math.round(img.width * 2);
-            const newHeight = Math.round(img.height * 0.4);
+            // Setup Transformed
+            const newWidth = Math.round(img.width * 1.4);
+            const newHeight = Math.round(img.height * 0.6);
             
             transformedCanvas.width = newWidth;
             transformedCanvas.height = newHeight;
             
             const transCtx = transformedCanvas.getContext('2d');
+            transCtx.imageSmoothingEnabled = true;
+            transCtx.imageSmoothingQuality = 'high';
             transCtx.drawImage(img, 0, 0, newWidth, newHeight);
+
+            // Create the mobile "ghost" image for long-press
+            const dataUrl = transformedCanvas.toDataURL('image/png');
+            mobilePreview.src = dataUrl;
 
             canvasContainer.style.display = 'block';
 
             info.innerHTML = `
                 <strong>Original:</strong> ${img.width} × ${img.height}px<br>
                 <strong>Transformed:</strong> ${newWidth} × ${newHeight}px<br>
-                <em>Width increased by 40%, height reduced by 40%</em>
+                <span style="color: #667eea;">📱 <strong>Mobile Tip:</strong> Long-press the transformed image and select "Save to Photos".</span>
             `;
         }
 
         downloadBtn.addEventListener('click', () => {
             const link = document.createElement('a');
             link.download = 'sail-analysed.png';
-            link.href = transformedCanvas.toDataURL();
+            link.href = transformedCanvas.toDataURL('image/png');
             link.click();
+            
+            // Fallback for some mobile browsers: open in new tab
+            if(window.navigator.userAgent.match(/iPhone|iPad|iPod|Android/i)) {
+                const newTab = window.open();
+                newTab.document.write(`<img src="${link.href}" style="width:100%" />`);
+                newTab.document.title = "Save Image";
+            }
         });
 
         resetBtn.addEventListener('click', () => {
             canvasContainer.style.display = 'none';
             fileInput.value = '';
+            mobilePreview.src = '';
         });
     </script>
 </body>
