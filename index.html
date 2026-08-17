@@ -15,6 +15,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -114,6 +115,9 @@
 
         canvas, #mobilePreview {
             max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
@@ -138,12 +142,131 @@
             line-height: 1.5;
         }
 
+        .controls {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .slider-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .slider-row label {
+            flex: 0 0 110px;
+            color: #333;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            accent-color: #667eea;
+        }
+
+        .slider-value {
+            flex: 0 0 55px;
+            text-align: right;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .reset-link {
+            background: none;
+            border: none;
+            color: #764ba2;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 0.85em;
+            padding: 0;
+            margin-top: 5px;
+        }
+
         @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+                padding: 16px;
+            }
+
             .canvas-wrapper {
                 grid-template-columns: 1fr;
+                gap: 16px;
             }
+
             .container {
-                padding: 20px;
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+
+            .container {
+                padding: 16px;
+                border-radius: 14px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .subtitle {
+                font-size: 0.85em;
+                margin-bottom: 20px;
+            }
+
+            .upload-area {
+                padding: 24px 16px;
+            }
+
+            .upload-icon {
+                font-size: 2.4em;
+                margin-bottom: 10px;
+            }
+
+            .btn {
+                width: 100%;
+                margin: 6px 0;
+                padding: 12px 20px;
+            }
+
+            .controls {
+                padding: 16px;
+            }
+
+            .slider-row {
+                gap: 10px;
+            }
+
+            .slider-row label {
+                flex-basis: 70px;
+                font-size: 0.85em;
+            }
+
+            .slider-value {
+                flex-basis: 48px;
+                font-size: 0.85em;
+            }
+
+            .info {
+                font-size: 0.85em;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 1000px;
             }
         }
     </style>
@@ -151,7 +274,7 @@
 <body>
     <div class="container">
         <h1>⛵ Quick Sail Analyser</h1>
-        <p class="subtitle">Transform your images: 40% shorter, 40% wider</p>
+        <p class="subtitle">Stretch your sails: widen the image while keeping its height</p>
 
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📸</div>
@@ -161,6 +284,14 @@
         </div>
 
         <div class="canvas-container" id="canvasContainer">
+            <div class="controls">
+                <div class="slider-row">
+                    <label for="widthSlider">Width</label>
+                    <input type="range" id="widthSlider" min="50" max="300" step="5" value="200">
+                    <span class="slider-value" id="widthValue">200%</span>
+                </div>
+                <button class="reset-link" id="resetSlidersBtn">Reset to default</button>
+            </div>
             <div class="canvas-wrapper">
                 <div class="canvas-box">
                     <h3>Original</h3>
@@ -190,6 +321,15 @@
         const downloadBtn = document.getElementById('downloadBtn');
         const resetBtn = document.getElementById('resetBtn');
         const info = document.getElementById('info');
+        const widthSlider = document.getElementById('widthSlider');
+        const widthValue = document.getElementById('widthValue');
+        const resetSlidersBtn = document.getElementById('resetSlidersBtn');
+
+        // Default squish setting — the slider always starts here for every new image.
+        // Height is never touched: it always stays at the original height.
+        const DEFAULT_WIDTH_PCT = 200;
+
+        let currentImage = null;
 
         uploadArea.addEventListener('click', () => fileInput.click());
 
@@ -227,43 +367,72 @@
         }
 
         function displayImages(img) {
-            // Setup Original
+            currentImage = img;
+
+            // Every new image starts from the default squish setting.
+            widthSlider.value = DEFAULT_WIDTH_PCT;
+            updateSliderLabels();
+
             const origCtx = originalCanvas.getContext('2d');
             originalCanvas.width = img.width;
             originalCanvas.height = img.height;
             origCtx.drawImage(img, 0, 0);
 
-            // Setup Transformed
-            const newWidth = Math.round(img.width * 1.4);
-            const newHeight = Math.round(img.height * 0.6);
-            
+            canvasContainer.style.display = 'block';
+
+            renderTransformed();
+        }
+
+        function renderTransformed() {
+            if (!currentImage) return;
+
+            const widthPct = Number(widthSlider.value);
+
+            const newWidth = Math.max(1, Math.round(currentImage.width * (widthPct / 100)));
+            const newHeight = currentImage.height;
+
             transformedCanvas.width = newWidth;
             transformedCanvas.height = newHeight;
-            
+
             const transCtx = transformedCanvas.getContext('2d');
             transCtx.imageSmoothingEnabled = true;
             transCtx.imageSmoothingQuality = 'high';
-            transCtx.drawImage(img, 0, 0, newWidth, newHeight);
+            transCtx.clearRect(0, 0, newWidth, newHeight);
+            transCtx.drawImage(currentImage, 0, 0, newWidth, newHeight);
 
-            // Create the mobile "ghost" image for long-press
-            const dataUrl = transformedCanvas.toDataURL('image/png');
-            mobilePreview.src = dataUrl;
-
-            canvasContainer.style.display = 'block';
+            // Refresh the mobile "ghost" image so long-press-to-save always
+            // matches whatever the slider is currently set to.
+            mobilePreview.src = transformedCanvas.toDataURL('image/png');
 
             info.innerHTML = `
-                <strong>Original:</strong> ${img.width} × ${img.height}px<br>
+                <strong>Original:</strong> ${currentImage.width} × ${currentImage.height}px<br>
                 <strong>Transformed:</strong> ${newWidth} × ${newHeight}px<br>
+                <em>Width set to ${widthPct}% of original, height unchanged</em><br>
                 <span style="color: #667eea;">📱 <strong>Mobile Tip:</strong> Long-press the transformed image and select "Save to Photos".</span>
             `;
         }
+
+        function updateSliderLabels() {
+            widthValue.textContent = `${widthSlider.value}%`;
+        }
+
+        widthSlider.addEventListener('input', () => {
+            updateSliderLabels();
+            renderTransformed();
+        });
+
+        resetSlidersBtn.addEventListener('click', () => {
+            widthSlider.value = DEFAULT_WIDTH_PCT;
+            updateSliderLabels();
+            renderTransformed();
+        });
 
         downloadBtn.addEventListener('click', () => {
             const link = document.createElement('a');
             link.download = 'sail-analysed.png';
             link.href = transformedCanvas.toDataURL('image/png');
             link.click();
-            
+
             // Fallback for some mobile browsers: open in new tab
             if(window.navigator.userAgent.match(/iPhone|iPad|iPod|Android/i)) {
                 const newTab = window.open();
@@ -276,6 +445,7 @@
             canvasContainer.style.display = 'none';
             fileInput.value = '';
             mobilePreview.src = '';
+            currentImage = null;
         });
     </script>
 </body>
